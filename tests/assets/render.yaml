@@ -1,0 +1,6 @@
+root-dir: root
+parts:
+  foo-bar:
+    render-quality: 32
+  sub-dir:
+    render-quality: 32

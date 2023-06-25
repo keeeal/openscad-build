@@ -1,0 +1,15 @@
+version: "3.4"
+services:
+
+  openscad-build:
+    image: openscad-build:latest
+    build:
+      target: base
+
+  dev:
+    image: openscad-build:dev
+    build:
+      target: dev
+    volumes:
+      - ./src:/src
+      - ./tests:/tests
