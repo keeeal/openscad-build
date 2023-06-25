@@ -3,12 +3,12 @@
 from collections import Counter
 from pathlib import Path
 from string import ascii_letters, digits
-from subprocess import CalledProcessError, check_call
+from subprocess import check_call
 from tempfile import NamedTemporaryFile
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 from fire import Fire
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 from yaml import safe_load
 
 SUBASSEMBLY_STEM = "__subassembly__"
@@ -46,13 +46,13 @@ def get_modules(root_dir: Path, sort: bool = True) -> dict[str, Path]:
         name = variable_name(module)
 
         if not any(line.startswith(f"module {name}(") for line in lines):
-            raise ValueError(f"Expected module '{name}' in {file}")
+            raise ValueError(f"Expected module '{name}' in '{file}'")
 
         modules[module] = file.absolute()
         names.append(name)
 
     if len(modules) == 0:
-        raise ValueError(f"No OpenSCAD files found in {root_dir}")
+        raise ValueError(f"No OpenSCAD files found in '{root_dir}'")
 
     if len(counts := Counter(names)) != len(names):
         raise ValueError(

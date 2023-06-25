@@ -39,4 +39,5 @@ jobs:
           context: .
           labels: ${{ steps.metadata.outputs.labels }}
           tags: ${{ steps.metadata.outputs.tags }}
+          target: base
           push: true
