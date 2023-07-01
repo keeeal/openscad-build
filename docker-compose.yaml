@@ -4,11 +4,13 @@ services:
   openscad-build:
     image: openscad-build:latest
     build:
+      context: .
       target: base
 
   dev:
     image: openscad-build:dev
     build:
+      context: .
       target: dev
     volumes:
       - ./src:/src

@@ -3,7 +3,7 @@
 from collections import Counter
 from pathlib import Path
 from string import ascii_letters, digits
-from subprocess import check_call
+from subprocess import STDOUT, check_output
 from tempfile import NamedTemporaryFile
 from typing import Optional, Union
 
@@ -15,7 +15,8 @@ SUBASSEMBLY_STEM = "__subassembly__"
 
 
 class PartConfig(BaseModel):
-    render_quality: int = Field(alias="render-quality")
+    render_quality: int = Field(alias="render-quality", default=32)
+    log: bool = False
 
 
 class RenderConfig(BaseModel):
@@ -102,6 +103,7 @@ def render(
     render_config_path: Union[Path, str],
     output_dir: Optional[Union[Path, str]] = None,
     render_quality: Optional[int] = None,
+    log: Optional[bool] = None,
 ) -> None:
     render_config_path = Path(render_config_path)
     output_dir = output_dir or render_config_path.parent
@@ -121,15 +123,20 @@ def render(
     )
 
     for part, part_config in render_config.parts.items():
-        check_call(
+        output = check_output(
             [
                 "openscad",
                 *("-o", str(output_dir / f"{part}.stl")),
                 *("-D", f"$fn={render_quality or part_config.render_quality}"),
                 *("-D", f'part="{part}"'),
                 tmp_main,
-            ]
+            ],
+            stderr=STDOUT,
         )
+
+        if log if log is not None else part_config.log:
+            with open(output_dir / f"{part}.log", "wb+") as f:
+                f.write(output)
 
 
 if __name__ == "__main__":

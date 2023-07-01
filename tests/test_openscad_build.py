@@ -2,6 +2,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Callable
 
+from openscad_logs import read_log_file
 from pytest import raises
 
 
@@ -117,3 +118,36 @@ def test_render(src_module: ModuleType, root_dir: Path, render_config: Path):
     render(render_config)
     stl_stems = {file.stem for file in render_config.parent.glob("*.stl")}
     assert stl_stems == {"sub-dir", "foo-bar"}
+
+
+def test_render__logs(src_module: ModuleType, root_dir: Path, render_config: Path):
+    render: Callable = src_module.render
+
+    assert len(list(render_config.parent.glob("*.log"))) == 0
+    render(render_config, log=True)
+    log_stems = {file.stem for file in render_config.parent.glob("*.log")}
+    assert log_stems == {"sub-dir", "foo-bar"}
+
+    log_data = read_log_file(render_config.parent / "sub-dir.log")
+    expected_data = {
+        "Geometries in cache": 1,
+        "Geometry cache size in bytes": 728,
+        "CGAL Polyhedrons in cache": 0,
+        "CGAL cache size in bytes": 0,
+        "Top level object is a 3D object": "",
+        "Facets": 6,
+    }
+    for key, value in expected_data.items():
+        assert log_data[key] == value
+
+    log_data = read_log_file(render_config.parent / "foo-bar.log")
+    expected_data = {
+        "Geometries in cache": 1,
+        "Geometry cache size in bytes": 70808,
+        "CGAL Polyhedrons in cache": 0,
+        "CGAL cache size in bytes": 0,
+        "Top level object is a 3D object": "",
+        "Facets": 962,
+    }
+    for key, value in expected_data.items():
+        assert log_data[key] == value
