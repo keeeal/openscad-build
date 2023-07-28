@@ -32,7 +32,9 @@ def read_log_file(log_file: Path) -> dict[str, Any]:
             if ":" in line
         ]
 
-    data = {line[0]: (None if len(line) < 2 else line[1]) for line in lines}
+    data: dict[str, Any] = {
+        line[0]: (None if len(line) < 2 else line[1]) for line in lines
+    }
 
     for key, value in data.items():
         if key in INT_KEYS:

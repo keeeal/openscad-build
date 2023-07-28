@@ -6,18 +6,18 @@ from openscad_logs import read_log_file
 from pytest import raises
 
 
-def test_variable_name(src_module: ModuleType):
-    variable_name: Callable = src_module.variable_name
+def test_variable_name(openscad_build_module: ModuleType):
+    variable_name: Callable = openscad_build_module.variable_name
 
     assert variable_name("foo-bar") == "foo_bar"
 
 
-def test_get_modules(src_module: ModuleType, root_dir: Path):
-    get_modules: Callable = src_module.get_modules
-    sub_dir = root_dir / "sub-dir"
+def test_get_modules(openscad_build_module: ModuleType, root_path: Path):
+    get_modules: Callable = openscad_build_module.get_modules
+    sub_path = root_path / "sub-dir"
 
-    assert list(get_modules(sub_dir, sort=True)) == ["baz", "sub-dir"]
-    assert list(get_modules(root_dir, sort=True)) == [
+    assert list(get_modules(sub_path, sort=True)) == ["baz", "sub-dir"]
+    assert list(get_modules(root_path, sort=True)) == [
         "baz",
         "foo-bar",
         "root",
@@ -25,67 +25,71 @@ def test_get_modules(src_module: ModuleType, root_dir: Path):
     ]
 
 
-def test_get_modules__no_scad_files(src_module: ModuleType, tmp_dir: Path):
-    get_modules: Callable = src_module.get_modules
+def test_get_modules__no_scad_files(openscad_build_module: ModuleType, tmp_path: Path):
+    get_modules: Callable = openscad_build_module.get_modules
 
-    assert len(list(tmp_dir.iterdir())) == 0
+    assert len(list(tmp_path.iterdir())) == 0
 
     with raises(ValueError) as error:
-        get_modules(tmp_dir)
+        get_modules(tmp_path)
     assert error.match("No OpenSCAD files found")
 
-    with open(tmp_dir / "not-an-scad-file.txt", "w+") as f:
+    with open(tmp_path / "not-an-scad-file.txt", "w+") as f:
         f.write("Hello world!")
 
-    assert len(list(tmp_dir.iterdir())) == 1
+    assert len(list(tmp_path.iterdir())) == 1
 
     with raises(ValueError) as error:
-        get_modules(tmp_dir)
+        get_modules(tmp_path)
     assert error.match("No OpenSCAD files found")
 
 
-def test_get_modules__incorrect_module_name(src_module: ModuleType, root_dir: Path):
-    get_modules: Callable = src_module.get_modules
+def test_get_modules__incorrect_module_name(
+    openscad_build_module: ModuleType, root_path: Path
+):
+    get_modules: Callable = openscad_build_module.get_modules
 
-    with open(root_dir / "foo-bar.scad", "w+") as f:
+    with open(root_path / "foo-bar.scad", "w+") as f:
         f.write("module incorrect_name() sphere();")
 
     with raises(ValueError) as error:
-        get_modules(root_dir)
+        get_modules(root_path)
     assert error.match("Expected module")
 
 
 def test_get_modules__incorrect_subassembly_name(
-    src_module: ModuleType, root_dir: Path
+    openscad_build_module: ModuleType, root_path: Path
 ):
-    get_modules: Callable = src_module.get_modules
+    get_modules: Callable = openscad_build_module.get_modules
 
-    with open(root_dir / "__subassembly__.scad", "w+") as f:
+    with open(root_path / "__subassembly__.scad", "w+") as f:
         f.write("module incorrect_name() sphere();")
 
     with raises(ValueError) as error:
-        get_modules(root_dir)
+        get_modules(root_path)
     assert error.match("Expected module")
 
 
-def test_get_modules__duplicate_modules(src_module: ModuleType, root_dir: Path):
-    get_modules: Callable = src_module.get_modules
-    sub_dir = root_dir / "sub-dir"
+def test_get_modules__duplicate_modules(
+    openscad_build_module: ModuleType, root_path: Path
+):
+    get_modules: Callable = openscad_build_module.get_modules
+    sub_path = root_path / "sub-dir"
 
-    with open(sub_dir / "foo-bar.scad", "w+") as f:
+    with open(sub_path / "foo-bar.scad", "w+") as f:
         f.write("module foo_bar() sphere();")
 
     with raises(ValueError) as error:
-        get_modules(root_dir)
+        get_modules(root_path)
     assert error.match("Duplicate modules found")
 
 
-def test_write_main(src_module: ModuleType, root_dir: Path):
-    write_main: Callable = src_module.write_main
-    main_file = root_dir.parent / "main.scad"
+def test_write_main(openscad_build_module: ModuleType, root_path: Path):
+    write_main: Callable = openscad_build_module.write_main
+    main_file = root_path.parent / "main.scad"
 
     assert not main_file.exists()
-    write_main(root_dir)
+    write_main(root_path)
     assert main_file.exists()
 
     with open(main_file) as f:
@@ -100,7 +104,7 @@ def test_write_main(src_module: ModuleType, root_dir: Path):
         "sub-dir/__subassembly__.scad",
         "sub-dir/baz.scad",
     ):
-        assert f"use <{root_dir / scad_file}>" in main_lines
+        assert f"use <{root_path / scad_file}>" in main_lines
 
     for part_name, variable_name in (
         ("baz", "baz"),
@@ -111,8 +115,10 @@ def test_write_main(src_module: ModuleType, root_dir: Path):
         assert f'if (part == "{part_name}") {variable_name}();' in main_lines
 
 
-def test_render(src_module: ModuleType, root_dir: Path, render_config: Path):
-    render: Callable = src_module.render
+def test_render(
+    openscad_build_module: ModuleType, root_path: Path, render_config: Path
+):
+    render: Callable = openscad_build_module.render
 
     assert len(list(render_config.parent.glob("*.stl"))) == 0
     render(render_config)
@@ -120,8 +126,10 @@ def test_render(src_module: ModuleType, root_dir: Path, render_config: Path):
     assert stl_stems == {"sub-dir", "foo-bar"}
 
 
-def test_render__logs(src_module: ModuleType, root_dir: Path, render_config: Path):
-    render: Callable = src_module.render
+def test_render__logs(
+    openscad_build_module: ModuleType, root_path: Path, render_config: Path
+):
+    render: Callable = openscad_build_module.render
 
     assert len(list(render_config.parent.glob("*.log"))) == 0
     render(render_config, log=True)

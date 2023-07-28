@@ -7,7 +7,7 @@ from subprocess import STDOUT, check_output
 from tempfile import NamedTemporaryFile
 from typing import Optional, Union
 
-from fire import Fire
+from fire import Fire  # type: ignore[import]
 from pydantic import BaseModel, Field
 from yaml import safe_load
 
