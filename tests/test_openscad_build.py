@@ -16,7 +16,10 @@ def test_get_modules(openscad_build_module: ModuleType, root_path: Path):
     get_modules: Callable = openscad_build_module.get_modules
     sub_path = root_path / "sub-dir"
 
-    assert get_modules(sub_path).keys() == {"baz", "sub-dir"}
+    assert get_modules(sub_path).keys() == {
+        "baz",
+        "sub-dir",
+    }
     assert get_modules(root_path).keys() == {
         "baz",
         "foo-bar",
