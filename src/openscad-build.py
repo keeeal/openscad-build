@@ -7,9 +7,11 @@ from string import ascii_letters, digits
 from subprocess import STDOUT, check_output
 from tempfile import NamedTemporaryFile
 from time import time
-from typing import Any, Optional, Union
+from typing import Optional, Union
+from os.path import relpath
 
 from fire import Fire  # type: ignore[import]
+from loguru import logger
 from pydantic import BaseModel, Field
 from yaml import safe_load
 
@@ -24,10 +26,6 @@ class PartConfig(BaseModel):
 class RenderConfig(BaseModel):
     root_dir: Path = Field(alias="root-dir")
     parts: dict[str, PartConfig]
-
-
-def _print(*args: Any, **kwargs: Any) -> None:
-    print(f"{Path(__file__).stem}:", *args, **kwargs)
 
 
 def is_subassembly(file: Path) -> bool:
@@ -84,7 +82,7 @@ def write_main(
         "$fn = 32;  // [16:128]\n",
         "\n",
         *(
-            f"use <{file.relative_to(output_file.parent)}>\n"
+            f"use <{relpath(file, output_file.parent)}>\n"
             for file in modules.values()
         ),
         "\n",
@@ -124,7 +122,7 @@ def render(
     )
 
     for part, part_config in render_config.parts.items():
-        _print(f"Rendering {part.ljust(max(map(len, render_config.parts)))}", end="...")
+        logger.info(f"Rendering {part.ljust(max(map(len, render_config.parts)))}", end="... ")
         start = time()
         output = check_output(
             [
@@ -136,7 +134,7 @@ def render(
             ],
             stderr=STDOUT,
         )
-        print(f" took {timedelta(seconds=time() - start)}")
+        logger.success(f"took {timedelta(seconds=time() - start)}")
 
         if log if log is not None else part_config.log:
             with open(output_dir / f"{part}.log", "wb+") as f:
@@ -152,5 +150,5 @@ if __name__ == "__main__":
             }
         )
     except Exception as error:
-        _print(str(error))
+        logger.error(str(error))
         exit(1)
