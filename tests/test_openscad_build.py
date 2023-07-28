@@ -16,11 +16,11 @@ def test_get_modules(openscad_build_module: ModuleType, root_path: Path):
     get_modules: Callable = openscad_build_module.get_modules
     sub_path = root_path / "sub-dir"
 
-    assert list(get_modules(sub_path, sort=True)) == ["baz", "sub-dir"]
-    assert list(get_modules(root_path, sort=True)) == [
-        "baz",
-        "foo-bar",
+    assert list(get_modules(sub_path)) == ["baz", "sub-dir"]
+    assert list(get_modules(root_path)) == [
         "root",
+        "foo-bar",
+        "baz",
         "sub-dir",
     ]
 
@@ -99,12 +99,12 @@ def test_write_main(openscad_build_module: ModuleType, root_path: Path):
     assert sum(line.startswith("part = ") for line in main_lines) == 1
 
     for scad_file in (
-        "__subassembly__.scad",
-        "foo-bar.scad",
-        "sub-dir/__subassembly__.scad",
-        "sub-dir/baz.scad",
+        "root/__subassembly__.scad",
+        "root/foo-bar.scad",
+        "root/sub-dir/__subassembly__.scad",
+        "root/sub-dir/baz.scad",
     ):
-        assert f"use <{root_path / scad_file}>" in main_lines
+        assert f"use <{scad_file}>" in main_lines
 
     for part_name, variable_name in (
         ("baz", "baz"),
