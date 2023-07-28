@@ -2,13 +2,13 @@
 
 from collections import Counter
 from datetime import timedelta
+from os.path import relpath
 from pathlib import Path
 from string import ascii_letters, digits
 from subprocess import STDOUT, check_output
 from tempfile import NamedTemporaryFile
 from time import time
 from typing import Optional, Union
-from os.path import relpath
 
 from fire import Fire  # type: ignore[import]
 from loguru import logger
@@ -81,10 +81,7 @@ def write_main(
     lines = [
         "$fn = 32;  // [16:128]\n",
         "\n",
-        *(
-            f"use <{relpath(file, output_file.parent)}>\n"
-            for file in modules.values()
-        ),
+        *(f"use <{relpath(file, output_file.parent)}>\n" for file in modules.values()),
         "\n",
         f"part = '{default_part}';  // {list(modules)}\n".replace("'", '"'),
         "\n",
@@ -122,7 +119,9 @@ def render(
     )
 
     for part, part_config in render_config.parts.items():
-        logger.info(f"Rendering {part.ljust(max(map(len, render_config.parts)))}", end="... ")
+        logger.info(
+            f"Rendering {part.ljust(max(map(len, render_config.parts)))}", end="... "
+        )
         start = time()
         output = check_output(
             [
