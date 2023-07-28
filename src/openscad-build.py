@@ -35,7 +35,7 @@ def variable_name(name: str) -> str:
     return "".join(map(variable_name, name))
 
 
-def get_modules(root_dir: Path, sort: bool = True) -> dict[str, Path]:
+def get_modules(root_dir: Path) -> dict[str, Path]:
     modules = dict()
     names = list()
 
@@ -49,7 +49,7 @@ def get_modules(root_dir: Path, sort: bool = True) -> dict[str, Path]:
         if not any(line.startswith(f"module {name}(") for line in lines):
             raise ValueError(f"Expected module '{name}' in '{file}'")
 
-        modules[module] = file.absolute()
+        modules[module] = file
         names.append(name)
 
     if len(modules) == 0:
@@ -60,19 +60,27 @@ def get_modules(root_dir: Path, sort: bool = True) -> dict[str, Path]:
             f"Duplicate modules found: {', '.join(name for name, count in counts.items() if count > 1)}"
         )
 
-    return dict(sorted(modules.items())) if sort else modules
+    return modules
 
 
-def get_main_lines(
-    modules: dict[str, Path],
+def write_main(
+    root_dir: Union[Path, str],
+    output_file: Optional[Union[Path, str]] = None,
     default_part: Optional[str] = None,
-) -> list[str]:
+) -> None:
+    root_dir = Path(root_dir)
+    output_file = Path(output_file or root_dir.parent / "main.scad")
+
+    modules = get_modules(root_dir)
     default_part = default_part or next(iter(modules))
 
-    return [
+    lines = [
         "$fn = 32;  // [16:128]\n",
         "\n",
-        *(f"use <{file}>\n" for file in modules.values()),
+        *(
+            f"use <{file.relative_to(output_file.parent)}>\n"
+            for file in modules.values()
+        ),
         "\n",
         f"part = '{default_part}';  // {list(modules)}\n".replace("'", '"'),
         "\n",
@@ -81,19 +89,6 @@ def get_main_lines(
             for module in modules
         ),
     ]
-
-
-def write_main(
-    root_dir: Union[Path, str],
-    output_file: Optional[Union[Path, str]] = None,
-    sort_modules: bool = True,
-) -> None:
-    root_dir = Path(root_dir)
-    output_file = output_file or root_dir.parent / "main.scad"
-    output_file = Path(output_file)
-
-    modules = get_modules(root_dir, sort=sort_modules)
-    lines = get_main_lines(modules)
 
     with open(output_file, "w+") as f:
         f.writelines(lines)
