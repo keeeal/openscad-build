@@ -119,9 +119,7 @@ def render(
     )
 
     for part, part_config in render_config.parts.items():
-        logger.info(
-            f"Rendering {part.ljust(max(map(len, render_config.parts)))}", end="... "
-        )
+        logger.info(f"Rendering {part}...")
         start = time()
         output = check_output(
             [
