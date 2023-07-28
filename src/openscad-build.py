@@ -135,13 +135,13 @@ def render(
 
 
 if __name__ == "__main__":
-    # try:
-    Fire(
-        {
-            "write-main": write_main,
-            "render": render,
-        }
-    )
-    # except Exception as error:
-    #     print(f"{Path(__file__).stem}: {error}")
-    #     exit(1)
+    try:
+        Fire(
+            {
+                "write-main": write_main,
+                "render": render,
+            }
+        )
+    except Exception as error:
+        print(f"{Path(__file__).stem}: {error}")
+        exit(1)
