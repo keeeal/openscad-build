@@ -14,7 +14,10 @@ RUN for f in /usr/bin/*.py; do chmod u+x $f && mv $f $(dirname $f)/$(basename $f
 
 FROM base AS dev
 
-RUN pip --no-cache-dir install --upgrade \
+RUN pip --no-cache-dir install --upgrade pip && \
+    pip --no-cache-dir install --upgrade \
     black \
     isort \
-    pytest
+    mypy \
+    pytest \
+    types-pyyaml
