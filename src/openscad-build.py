@@ -111,7 +111,7 @@ def render(
     except TypeError:
         raise ValueError(f"Error reading {render_config_path}")
 
-    tmp_main = NamedTemporaryFile().name
+    tmp_main = NamedTemporaryFile(suffix=".scad").name
 
     write_main(
         render_config_path.parent / render_config.root_dir,
