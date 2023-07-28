@@ -2,14 +2,16 @@
 
 from collections import Counter
 from datetime import timedelta
+from os.path import relpath
 from pathlib import Path
 from string import ascii_letters, digits
 from subprocess import STDOUT, check_output
 from tempfile import NamedTemporaryFile
 from time import time
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 from fire import Fire  # type: ignore[import]
+from loguru import logger
 from pydantic import BaseModel, Field
 from yaml import safe_load
 
@@ -24,10 +26,6 @@ class PartConfig(BaseModel):
 class RenderConfig(BaseModel):
     root_dir: Path = Field(alias="root-dir")
     parts: dict[str, PartConfig]
-
-
-def _print(*args: Any, **kwargs: Any) -> None:
-    print(f"{Path(__file__).stem}:", *args, **kwargs)
 
 
 def is_subassembly(file: Path) -> bool:
@@ -83,10 +81,7 @@ def write_main(
     lines = [
         "$fn = 32;  // [16:128]\n",
         "\n",
-        *(
-            f"use <{file.relative_to(output_file.parent)}>\n"
-            for file in modules.values()
-        ),
+        *(f"use <{relpath(file, output_file.parent)}>\n" for file in modules.values()),
         "\n",
         f"part = '{default_part}';  // {list(modules)}\n".replace("'", '"'),
         "\n",
@@ -116,7 +111,7 @@ def render(
     except TypeError:
         raise ValueError(f"Error reading {render_config_path}")
 
-    tmp_main = NamedTemporaryFile().name
+    tmp_main = NamedTemporaryFile(suffix=".scad").name
 
     write_main(
         render_config_path.parent / render_config.root_dir,
@@ -124,7 +119,7 @@ def render(
     )
 
     for part, part_config in render_config.parts.items():
-        _print(f"Rendering {part.ljust(max(map(len, render_config.parts)))}", end="...")
+        logger.info(f"Rendering {part}...")
         start = time()
         output = check_output(
             [
@@ -136,7 +131,7 @@ def render(
             ],
             stderr=STDOUT,
         )
-        print(f" took {timedelta(seconds=time() - start)}")
+        logger.success(f"took {timedelta(seconds=time() - start)}")
 
         if log if log is not None else part_config.log:
             with open(output_dir / f"{part}.log", "wb+") as f:
@@ -152,5 +147,5 @@ if __name__ == "__main__":
             }
         )
     except Exception as error:
-        _print(str(error))
+        logger.error(str(error))
         exit(1)

@@ -6,6 +6,7 @@ RUN apt update && apt install -y \
 RUN pip --no-cache-dir install --upgrade pip && \
     pip --no-cache-dir install --upgrade \
     fire \
+    loguru \
     pydantic \
     pyyaml
 
