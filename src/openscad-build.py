@@ -1,11 +1,13 @@
 #!/usr/local/bin/python
 
 from collections import Counter
+from datetime import timedelta
 from pathlib import Path
 from string import ascii_letters, digits
 from subprocess import STDOUT, check_output
 from tempfile import NamedTemporaryFile
-from typing import Optional, Union
+from time import time
+from typing import Any, Optional, Union
 
 from fire import Fire  # type: ignore[import]
 from pydantic import BaseModel, Field
@@ -22,6 +24,10 @@ class PartConfig(BaseModel):
 class RenderConfig(BaseModel):
     root_dir: Path = Field(alias="root-dir")
     parts: dict[str, PartConfig]
+
+
+def _print(*args: Any, **kwargs: Any) -> None:
+    print(f"{Path(__file__).stem}:", *args, **kwargs)
 
 
 def is_subassembly(file: Path) -> bool:
@@ -118,6 +124,8 @@ def render(
     )
 
     for part, part_config in render_config.parts.items():
+        _print(f"Rendering {part.ljust(max(map(len, render_config.parts)))}", end="...")
+        start = time()
         output = check_output(
             [
                 "openscad",
@@ -128,6 +136,7 @@ def render(
             ],
             stderr=STDOUT,
         )
+        print(f" took {timedelta(seconds=time() - start)}")
 
         if log if log is not None else part_config.log:
             with open(output_dir / f"{part}.log", "wb+") as f:
@@ -143,5 +152,5 @@ if __name__ == "__main__":
             }
         )
     except Exception as error:
-        print(f"{Path(__file__).stem}: {error}")
+        _print(str(error))
         exit(1)
