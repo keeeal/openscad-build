@@ -3,7 +3,6 @@ from types import ModuleType
 from typing import Callable
 
 from openscad_logs import read_log_file
-from pytest import raises
 
 
 def test_variable_name(openscad_build_module: ModuleType):
@@ -16,15 +15,15 @@ def test_get_modules(openscad_build_module: ModuleType, root_path: Path):
     get_modules: Callable = openscad_build_module.get_modules
     sub_path = root_path / "sub-dir"
 
-    assert get_modules(sub_path).keys() == {
-        "baz",
-        "sub-dir",
+    assert get_modules(sub_path) == {
+        sub_path / "__subassembly__.scad": "sub_dir",
+        sub_path / "baz.scad": "baz",
     }
-    assert get_modules(root_path).keys() == {
-        "baz",
-        "foo-bar",
-        "root",
-        "sub-dir",
+    assert get_modules(root_path) == {
+        root_path / "__subassembly__.scad": "root",
+        root_path / "foo-bar.scad": "foo_bar",
+        root_path / "sub-dir" / "__subassembly__.scad": "sub_dir",
+        root_path / "sub-dir" / "baz.scad": "baz",
     }
 
 
@@ -32,22 +31,16 @@ def test_get_modules__no_scad_files(openscad_build_module: ModuleType, tmp_path:
     get_modules: Callable = openscad_build_module.get_modules
 
     assert len(list(tmp_path.iterdir())) == 0
-
-    with raises(ValueError) as error:
-        get_modules(tmp_path)
-    assert error.match("No OpenSCAD files found")
+    assert len(get_modules(tmp_path)) == 0
 
     with open(tmp_path / "not-an-scad-file.txt", "w+") as f:
         f.write("Hello world!")
 
     assert len(list(tmp_path.iterdir())) == 1
-
-    with raises(ValueError) as error:
-        get_modules(tmp_path)
-    assert error.match("No OpenSCAD files found")
+    assert len(get_modules(tmp_path)) == 0
 
 
-def test_get_modules__incorrect_module_name(
+def test_get_modules__ignore_openscad_file(
     openscad_build_module: ModuleType, root_path: Path
 ):
     get_modules: Callable = openscad_build_module.get_modules
@@ -55,12 +48,14 @@ def test_get_modules__incorrect_module_name(
     with open(root_path / "foo-bar.scad", "w+") as f:
         f.write("module incorrect_name() sphere();")
 
-    with raises(ValueError) as error:
-        get_modules(root_path)
-    assert error.match("Expected module")
+    assert get_modules(root_path) == {
+        root_path / "__subassembly__.scad": "root",
+        root_path / "sub-dir" / "__subassembly__.scad": "sub_dir",
+        root_path / "sub-dir" / "baz.scad": "baz",
+    }
 
 
-def test_get_modules__incorrect_subassembly_name(
+def test_get_modules__ignore_subassembly_file(
     openscad_build_module: ModuleType, root_path: Path
 ):
     get_modules: Callable = openscad_build_module.get_modules
@@ -68,23 +63,11 @@ def test_get_modules__incorrect_subassembly_name(
     with open(root_path / "__subassembly__.scad", "w+") as f:
         f.write("module incorrect_name() sphere();")
 
-    with raises(ValueError) as error:
-        get_modules(root_path)
-    assert error.match("Expected module")
-
-
-def test_get_modules__duplicate_modules(
-    openscad_build_module: ModuleType, root_path: Path
-):
-    get_modules: Callable = openscad_build_module.get_modules
-    sub_path = root_path / "sub-dir"
-
-    with open(sub_path / "foo-bar.scad", "w+") as f:
-        f.write("module foo_bar() sphere();")
-
-    with raises(ValueError) as error:
-        get_modules(root_path)
-    assert error.match("Duplicate modules found")
+    assert get_modules(root_path) == {
+        root_path / "foo-bar.scad": "foo_bar",
+        root_path / "sub-dir" / "__subassembly__.scad": "sub_dir",
+        root_path / "sub-dir" / "baz.scad": "baz",
+    }
 
 
 def test_write_main(openscad_build_module: ModuleType, root_path: Path):
@@ -96,10 +79,10 @@ def test_write_main(openscad_build_module: ModuleType, root_path: Path):
     assert main_file.exists()
 
     with open(main_file) as f:
-        main_lines = list(filter(None, map(str.strip, f.readlines())))
+        lines = list(filter(None, map(str.strip, f.readlines())))
 
-    assert sum(line.startswith("$fn = ") for line in main_lines) == 1
-    assert sum(line.startswith("part = ") for line in main_lines) == 1
+    assert sum(line.startswith("$fn = ") for line in lines) == 1
+    assert sum(line.startswith("part = ") for line in lines) == 1
 
     for scad_file in (
         "root/__subassembly__.scad",
@@ -107,15 +90,46 @@ def test_write_main(openscad_build_module: ModuleType, root_path: Path):
         "root/sub-dir/__subassembly__.scad",
         "root/sub-dir/baz.scad",
     ):
-        assert f"use <{scad_file}>" in main_lines
+        assert f"use <{scad_file}>" in lines
 
     for part_name, variable_name in (
-        ("baz", "baz"),
-        ("foo-bar", "foo_bar"),
         ("root", "root"),
-        ("sub-dir", "sub_dir"),
+        ("root/foo-bar", "foo_bar"),
+        ("root/sub-dir", "sub_dir"),
+        ("root/sub-dir/baz", "baz"),
     ):
-        assert f'if (part == "{part_name}") {variable_name}();' in main_lines
+        assert f'if (part == "{part_name}") {variable_name}();' in lines
+
+
+def test_write_main__flatten(openscad_build_module: ModuleType, root_path: Path):
+    write_main: Callable = openscad_build_module.write_main
+    main_file = root_path.parent / "main.scad"
+
+    assert not main_file.exists()
+    write_main(root_path, flatten=True)
+    assert main_file.exists()
+
+    with open(main_file) as f:
+        lines = list(filter(None, map(str.strip, f.readlines())))
+
+    assert sum(line.startswith("$fn = ") for line in lines) == 1
+    assert sum(line.startswith("part = ") for line in lines) == 1
+
+    for scad_file in (
+        "root/__subassembly__.scad",
+        "root/foo-bar.scad",
+        "root/sub-dir/__subassembly__.scad",
+        "root/sub-dir/baz.scad",
+    ):
+        assert f"use <{scad_file}>" in lines
+
+    for part_name, variable_name in (
+        ("root", "root"),
+        ("foo-bar", "foo_bar"),
+        ("sub-dir", "sub_dir"),
+        ("baz", "baz"),
+    ):
+        assert f'if (part == "{part_name}") {variable_name}();' in lines
 
 
 def test_render(
