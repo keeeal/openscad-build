@@ -28,8 +28,8 @@ class RenderConfig(BaseModel):
     parts: dict[str, PartConfig]
 
 
-def is_subassembly(file: Path) -> bool:
-    return file.stem.lower() == SUBASSEMBLY_STEM.lower()
+def is_subassembly(path: Path) -> bool:
+    return path.is_file() and path.stem.lower() == SUBASSEMBLY_STEM.lower()
 
 
 def variable_name(name: str) -> str:
@@ -39,30 +39,19 @@ def variable_name(name: str) -> str:
     return "".join(map(variable_name, name))
 
 
-def get_modules(root_dir: Path) -> dict[str, Path]:
-    modules = dict()
-    names = list()
+def get_modules(root_dir: Path) -> dict[Path, str]:
+    modules: dict[Path, str] = dict()
 
-    for file in root_dir.rglob("*.scad"):
-        with open(file) as f:
+    for path in sorted(root_dir.rglob("*.scad")):
+        module = variable_name(path.parent.stem if is_subassembly(path) else path.stem)
+
+        with open(path) as f:
             lines = f.readlines()
 
-        module = file.parent.stem if is_subassembly(file) else file.stem
-        name = variable_name(module)
+        if not any(line.startswith(f"module {module}(") for line in lines):
+            continue
 
-        if not any(line.startswith(f"module {name}(") for line in lines):
-            raise ValueError(f"Expected module '{name}' in '{file}'")
-
-        modules[module] = file
-        names.append(name)
-
-    if len(modules) == 0:
-        raise ValueError(f"No OpenSCAD files found in '{root_dir}'")
-
-    if len(counts := Counter(names)) != len(names):
-        raise ValueError(
-            f"Duplicate modules found: {', '.join(name for name, count in counts.items() if count > 1)}"
-        )
+        modules[path] = module
 
     return modules
 
@@ -70,25 +59,36 @@ def get_modules(root_dir: Path) -> dict[str, Path]:
 def write_main(
     root_dir: Union[Path, str],
     output_file: Optional[Union[Path, str]] = None,
-    default_part: Optional[str] = None,
+    flatten: bool = False,
 ) -> None:
     root_dir = Path(root_dir)
     output_file = Path(output_file or root_dir.parent / "main.scad")
-
     modules = get_modules(root_dir)
-    default_part = default_part or next(iter(modules))
+
+    if len(modules) == 0:
+        raise ValueError(f"No modules found in '{root_dir}'")
+
+    if len(counts := Counter(modules.values())) != len(modules):
+        raise ValueError(
+            f"Duplicate modules found: {', '.join(k for k, n in counts.items() if n > 1)}"
+        )
+
+    def part_name(path: Path) -> str:
+        path = path.parent if is_subassembly(path) else path
+        path = path.relative_to(root_dir.parent)
+
+        return path.stem if flatten else str(path.parent / path.stem)
+
+    parts = {part_name(path): module for path, module in modules.items()}
 
     lines = [
         "$fn = 32;  // [16:128]\n",
         "\n",
-        *(f"use <{relpath(file, output_file.parent)}>\n" for file in modules.values()),
+        *(f"use <{relpath(path, output_file.parent)}>\n" for path in modules),
         "\n",
-        f"part = '{default_part}';  // {list(modules)}\n".replace("'", '"'),
+        f"part = '{next(iter(parts))}';  // {list(parts)}\n".replace("'", '"'),
         "\n",
-        *(
-            f'if (part == "{module}") {variable_name(module)}();\n'
-            for module in modules
-        ),
+        *(f'if (part == "{part}") {module}();\n' for part, module in parts.items()),
     ]
 
     with open(output_file, "w+") as f:
@@ -114,8 +114,9 @@ def render(
     tmp_main = NamedTemporaryFile(suffix=".scad").name
 
     write_main(
-        render_config_path.parent / render_config.root_dir,
+        root_dir=render_config_path.parent / render_config.root_dir,
         output_file=tmp_main,
+        flatten=True,
     )
 
     for part, part_config in render_config.parts.items():
