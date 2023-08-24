@@ -32,6 +32,14 @@ def is_subassembly(path: Path) -> bool:
     return path.is_file() and path.stem.lower() == SUBASSEMBLY_STEM.lower()
 
 
+def tree(path: Path) -> str:
+    return " ".join(
+        len(path.parts[:-2]) * ["│ "]
+        + min(len(path.parts) - 1, 1) * ["├─"]
+        + [path.stem]
+    )
+
+
 def variable_name(name: str) -> str:
     if len(name) == 1:
         return name if name in ascii_letters + digits + "_" else "_"
@@ -77,7 +85,7 @@ def write_main(
         path = path.parent if is_subassembly(path) else path
         path = path.relative_to(root_dir.parent)
 
-        return path.stem if flatten else str(path.parent / path.stem)
+        return path.stem if flatten else tree(path)
 
     parts = {part_name(path): module for path, module in modules.items()}
 
