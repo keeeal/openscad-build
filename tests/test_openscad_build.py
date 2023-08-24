@@ -94,9 +94,9 @@ def test_write_main(openscad_build_module: ModuleType, root_path: Path):
 
     for part_name, variable_name in (
         ("root", "root"),
-        ("root/foo-bar", "foo_bar"),
-        ("root/sub-dir", "sub_dir"),
-        ("root/sub-dir/baz", "baz"),
+        ("├─ foo-bar", "foo_bar"),
+        ("├─ sub-dir", "sub_dir"),
+        ("│  ├─ baz", "baz"),
     ):
         assert f'if (part == "{part_name}") {variable_name}();' in lines
 
