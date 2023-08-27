@@ -1,6 +1,7 @@
 #!/usr/local/bin/python
 
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 from datetime import timedelta
 from os.path import relpath
 from pathlib import Path
@@ -20,7 +21,7 @@ SUBASSEMBLY_STEM = "__subassembly__"
 
 class PartConfig(BaseModel):
     render_quality: int = Field(alias="render-quality", default=32)
-    log: bool = False
+    save_log: bool = False
 
 
 class RenderConfig(BaseModel):
@@ -103,11 +104,37 @@ def write_main(
         f.writelines(lines)
 
 
+def render_part(
+    output_dir: Path,
+    main_path: Path,
+    part: str,
+    render_quality: int,
+    save_log: bool,
+):
+    start = time()
+    output = check_output(
+        [
+            "openscad",
+            *("-o", str(output_dir / f"{part}.stl")),
+            *("-D", f"$fn={render_quality}"),
+            *("-D", f'part="{part}"'),
+            str(main_path),
+        ],
+        stderr=STDOUT,
+    )
+
+    logger.success(f"Rendered {part} in {timedelta(seconds=time() - start)}")
+
+    if save_log:
+        with open(output_dir / f"{part}.log", "wb+") as f:
+            f.write(output)
+
+
 def render(
     render_config_path: Union[Path, str],
     output_dir: Optional[Union[Path, str]] = None,
     render_quality: Optional[int] = None,
-    log: Optional[bool] = None,
+    save_logs: Optional[bool] = None,
 ) -> None:
     render_config_path = Path(render_config_path)
     output_dir = output_dir or render_config_path.parent
@@ -127,24 +154,18 @@ def render(
         flatten=True,
     )
 
-    for part, part_config in render_config.parts.items():
-        logger.info(f"Rendering {part}...")
-        start = time()
-        output = check_output(
-            [
-                "openscad",
-                *("-o", str(output_dir / f"{part}.stl")),
-                *("-D", f"$fn={render_quality or part_config.render_quality}"),
-                *("-D", f'part="{part}"'),
-                tmp_main,
-            ],
-            stderr=STDOUT,
-        )
-        logger.success(f"took {timedelta(seconds=time() - start)}")
+    logger.info(f"Rendering...")
 
-        if log if log is not None else part_config.log:
-            with open(output_dir / f"{part}.log", "wb+") as f:
-                f.write(output)
+    with ProcessPoolExecutor() as pool:
+        for part, part_config in render_config.parts.items():
+            pool.submit(
+                render_part,
+                output_dir=output_dir,
+                main_path=tmp_main,
+                part=part,
+                render_quality=render_quality or part_config.render_quality,
+                save_log=save_logs if save_logs is not None else part_config.save_log,
+            )
 
 
 if __name__ == "__main__":
