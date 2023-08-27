@@ -105,12 +105,14 @@ def write_main(
 
 
 def render_part(
-    output_dir: Path,
-    main_path: Path,
+    output_dir: Union[Path, str],
+    main_path: Union[Path, str],
     part: str,
     render_quality: int,
     save_log: bool,
 ):
+    output_dir = Path(output_dir)
+
     start = time()
     output = check_output(
         [
