@@ -149,7 +149,7 @@ def test_render__logs(
     render: Callable = openscad_build_module.render
 
     assert len(list(render_config.parent.glob("*.log"))) == 0
-    render(render_config, log=True)
+    render(render_config, save_logs=True)
     log_stems = {file.stem for file in render_config.parent.glob("*.log")}
     assert log_stems == {"sub-dir", "foo-bar"}
 
